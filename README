@@ -1,0 +1,135 @@
+The getwatchlist Splunk custom command
+----------------------
+Introduction
+----------------------
+Getwatchlist is a custom search command for Splunk which will return a CSV formatted list from a URL. This is useful for creating lookup tables and keeping them up to date from external or internal sources. These watchlists can contain virtually anything such as domain names, IP addresses, host names, email addresses, filenames, etc. and can then be used in searches against your events. These watchlists can be in any delimited format (tab, comma, space, etc.).
+
+----------------------
+Requirements
+----------------------
+This custom command has been tested on Splunk 4.1 as well as 4.2. Because of the Python modules used, the command will not work with Splunk 3.x.
+
+----------------------
+Installation
+----------------------
+To install, copy the downloaded tarball to the $SPLUNK_HOME/etc/apps directory and expand. This will create a directory named “getwatchlist” which contains the sample configuration file, the command.conf to enable the command, as well as permissions to enable usage of the command globally in Splunk. Splunk will need to be restarted for the new application and configuration to take.
+
+----------------------
+Usage 
+----------------------
+Options for getwatchlist can be supplied via the search options passed in the search box, a configuration file, or a combination of the two.
+
+The first argument passed to getwatchlist is the URL of the watchlist or the name of a profile in the configuration file. If a profile exists, it will be loaded first, and then options passed via the search command will be used to overwrite the stored settings. 
+
+Options are passed in a "key=value" fashion. 
+
+Arguments that are passed and are not known arguments will be appended as custom fields. So if I add a field of: 
+spam=tasty 
+Each line of the CSV which is returned will have a column named "spam", with a value of "tasty". 
+
+If there are additional columns in the list which you would like to be output as well, you can tell the command which column, and what the name if it should be. To do this, use an integer (the column number you would like to include), and give it a name for the column. To to include column 3 of a list, and name the column "enddate", you would add:
+3=enddate
+To your command parameters or configuration.
+
+Here are options which can be passed, or used in the configuration file: 
+categoryCol: The column number of any category field in the fetched file.
+comment (default: #): The character which is used to denote a commented out line .
+dateCol: The column number of any date field in the file which you would like to use for reference.
+delimiter (default: \t): The delimiter field of the fetched file .
+ignoreFirstLine (default: False): Some watchlists contain a header which is not commented out. If this is set to "True" this line will be ignored. 
+relevantFieldCol (default: 1): The column number (starting at 1) which contains the key value you would like to use .
+relevantFieldName (default: ip_address): What you would like the field to be named in the CSV output (not the name in the fetched CSV) .
+referenceCol: The column number of any reference field in the fetched CSV. 
+url: The URL of the file to be retrieved (HTTP, HTTPS or FTP).
+authUser: Username to use for authentication (HTTP Basic or FTP)
+authPassword: Password to use for authentication (HTTP Basic or FTP)
+proxyHost: Hostname or IP of the HTTP proxy to be used for HTTP and HTTPS connections
+proxyPort: Port for the HTTP proxy
+
+----------------------
+Configuration File
+----------------------
+Configurations are kept in files named getwatchlist.conf. An example of this file is in the /default/ directory of the application. It contains example profiles which are ready to use.
+
+Any custom configuration items in the /local/ version of the .conf file will override or add on to any settings in the /default/ file, much like normal Splunk configuration.
+
+Additionally, settings entered via the search command will override both the /default/ and /local/ settings.
+
+The "globals" section of the configuration file can be used for proxy configuration.
+By using the globals section, the command will use those settings by default, but can
+be overridden using command or profile settings.
+
+----------------------
+Examples 
+----------------------
+----------------------
+Splunk Searches to output a watchlist
+----------------------
+Malware Domains: 
+| getwatchlist http://mirror1.malwaredomains.com/files/domains.txt relevantFieldName="domain" relevantFieldCol=3 categoryCol=4 referenceCol=5 dateCol=6 isbad=true 
+
+Zeus tracker IP list: 
+| getwatchlist http://www.abuse.ch/zeustracker/blocklist.php?download=ipblocklist 
+
+DShield recommended block list: 
+| getwatchlist http://feeds.dshield.org/block.txt relevantFieldName='rangestart' ignoreFirstLine=True referenceCol=5 
+
+Spamhaus DROP list: 
+|getwatchlist http://www.spamhaus.org/drop/drop.lasso delimiter=; relevantFieldName='sourceRange' relevantFieldCol=1 referenceCol=2 ignoreFirstLine=True 
+
+----------------------
+Configuration File Examples
+----------------------
+More examples can be found in the configuration file.
+[phishtank] 
+url=http://data.phishtank.com/data/online-valid.csv 
+delimiter=,
+relevantFieldName=uri 
+relevantFieldCol=2 
+referenceCol=3 
+dateCol=4 
+ignoreFirstLine = True
+
+[malwaredomains] 
+url=http://mirror1.malwaredomains.com/files/domains.txt 
+relevantFieldName=domain 
+relevantFieldCol=3 
+categoryCol=4 
+referenceCol=5 
+dateCol=6 
+
+----------------------
+Splunk Searches using saved lookups
+----------------------
+Using a subsearch from the CSV: index="webproxy" [|inputlookup phishtank.csv | fields uri]
+Using a configured lookup: index="webproxy" | lookup phishtank uri | search isbad=true
+
+----------------------
+Version history
+----------------------
+0.7
+    First public release
+
+0.9
+    Added:
+        Support for proxies (proxyHost, proxyPort)
+        Support for HTTP and FTP authentication (authUser, authPass)
+    Changed:
+        Changed to urllib2 from urllib 
+        Update configuration file examples
+    Fixed:
+        Bug causing case sensitivity in search command parameters
+
+1.0
+    Added:
+        Better error handling and output in Splunk
+        The ability to add values from other columns in the fetched list.
+    Changed:
+        The configuration file has been made more Splunk-like. An example
+            file is in /default/ and custom profiles or configs can be
+            added to a getwatchlist.conf in the /local/ directory.
+        The URL for Malware Domains has been updated as from 8/1/11
+            the domains.txt file will only be available from mirrors
+    Security:
+        Note that a potential security vulnerability was found in
+        version 0.7. Users are urged to update.
