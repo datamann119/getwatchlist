@@ -1,17 +1,18 @@
+from __future__ import print_function
 import os
 import sys
-import urllib2
+import six.moves.urllib.request, six.moves.urllib.error, six.moves.urllib.parse
 import csv
 import ftplib
 import traceback
-from ConfigParser import SafeConfigParser
-from urlparse import urlparse
+from six.moves.configparser import ConfigParser
+from six.moves.urllib.parse import urlparse
 
 # Find the best implementation of StringIO available on this platform
 try:
-    from cStringIO import StringIO
+    from io import StringIO
 except:
-    from StringIO import StringIO
+    from io import StringIO
 
 # Try to import the Splunk SDK modules for better error reporting
 try:
@@ -91,7 +92,7 @@ def getDefaultSavedProfileNames():
     Reads in the names of the DEFAULT saved profiles from the getwatchlist.conf
     files in default and local and returns them as a list.
     """
-    parser = SafeConfigParser()
+    parser = ConfigParser()
     parser.optionxform = str
     parser.read(getDefaultConfPath())
     profileNames = parser.sections()
@@ -103,7 +104,7 @@ def getLocalSavedProfileNames():
     Reads in the names of the LOCAL saved profiles from the getwatchlist.conf
     files in default and local and returns them as a list.
     """
-    parser = SafeConfigParser()
+    parser = ConfigParser()
     parser.optionxform = str
     parser.read(getLocalConfPath())
     profileNames = parser.sections()
@@ -118,13 +119,13 @@ def getSavedProfileNames():
     profileNames = []
 
     # First the defaults
-    parser = SafeConfigParser()
+    parser = ConfigParser()
     parser.optionxform = str
     parser.read(getDefaultConfPath())
     profileNames = parser.sections()
 
     # Now the locals
-    parser = SafeConfigParser()
+    parser = ConfigParser()
     parser.optionxform = str
     parser.read(getLocalConfPath())
     localProfileNames = parser.sections()
@@ -160,10 +161,10 @@ def filterComments(fileBuffer, comment):
     """
     csvbuffer = ''
     for line in fileBuffer:
-        if line.startswith(comment) or not line.strip():
+        if line.startswith(comment.encode('utf-8')) or not line.strip():
             pass
         else:
-            csvbuffer = csvbuffer + line
+            csvbuffer = csvbuffer + line.decode()
     return csvbuffer
 
 ######################
@@ -204,7 +205,7 @@ def getSavedProfile(profileName):
     settings = getExactSavedProfile(profileName)
     localSettings = getExactSavedProfile(profileName, True)
 
-    for key in settings.keys():
+    for key in list(settings.keys()): 
         if key == 'customFields':
             if localSettings[key] != {}:
                 settings[key] = localSettings[key]
@@ -227,7 +228,7 @@ def getExactSavedProfile(profileName, fromLocal=False):
     is not found, it returns the default settings.
     """
 
-    parser = SafeConfigParser()
+    parser = ConfigParser()
     parser.optionxform = str
     if fromLocal:
         parser.read(getLocalConfPath())
@@ -402,20 +403,21 @@ def fetchHTTP(settings):
 
     # if the username or password is not empty, we will use an auth handler
     if authUser != '' or authPass != '':
-        passManager = urllib2.HTTPPasswordMgrWithDefaultRealm()
+        passManager = six.moves.urllib.request.HTTPPasswordMgrWithDefaultRealm()
         passManager.add_password(None, url, authUser, authPass)
-        authHandler = urllib2.HTTPBasicAuthHandler(passManager)
-        opener = urllib2.build_opener(authHandler)
-        urllib2.install_opener(opener)
+        
+        authHandler = six.moves.urllib.request.HTTPBasicAuthHandler(passManager)
+        opener = six.moves.urllib.request.build_opener(authHandler)
+        six.moves.urllib.request.install_opener(opener)
 
-    request = urllib2.Request(url)
+    request = six.moves.urllib.request.Request(url)
 
     if proxyHost != '':
         proxyHost = proxyHost + ':' + proxyPort
         request.set_proxy(proxyHost, 'http')
         # request.set_proxy(proxyHost, urlparse(url).scheme)
 
-    filehandle = urllib2.urlopen(request)
+    filehandle = six.moves.urllib.request.urlopen(request)
     return filterComments(filehandle, comment)
 
 def fetchWatchList(settings):
@@ -472,13 +474,13 @@ def outputWatchlist(csvbuffer, settings):
 
     # add any custom fields, keep the keys in a list, to remember the order
     customKeys = []
-    for k,v in customFields.iteritems():
+    for k,v in list(customFields.items()):
         customKeys.append(k)
         fieldList.append(k)
 
     # add any additional cols
     addKeys = []
-    for k,v in addCols.iteritems():
+    for k,v in list(addCols.items()):
         addKeys.append(k)
         fieldList.append(v)
 
@@ -531,47 +533,47 @@ if __name__ == '__main__':
             splunk.Intersplunk.outputResults(results)
             sys.exit()
         else:
-            print errorString
+            print(errorString)
             sys.exit()
 
     # Get the settings
     try:
         settings = getSettings(sys.argv[1:])
-    except Exception, err:
+    except Exception as err:
         errorString = "Error getting settings: " + str(err)
         if SPLUNKIMPORT:
             results = splunk.Intersplunk.generateErrorResults(errorString)
             splunk.Intersplunk.outputResults(results)
             sys.exit()
         else:
-            print errorString
+            print(errorString)
             traceback.print_tb(sys.exc_info()[2])
             sys.exit()
 
     # Now that we have our settings, let's get the watchlist
     try:
         watchlistContent = fetchWatchList(settings)
-    except Exception, err:
+    except Exception as err:
         errorString = "Error fetching watch list: " + str(err)
         if SPLUNKIMPORT:
             results = splunk.Intersplunk.generateErrorResults(errorString)
             splunk.Intersplunk.outputResults(results)
             sys.exit()
         else:
-            print errorString
+            print(errorString)
             traceback.print_tb(sys.exc_info()[2])
             sys.exit()
 
     # Now that we have the content, print it out in CSV
     try:
         outputWatchlist(watchlistContent, settings)
-    except Exception, err:
+    except Exception as err:
         errorString = "Error outputting watch list:" + str(err)
         if SPLUNKIMPORT:
             results = splunk.Intersplunk.generateErrorResults(errorString)
             splunk.Intersplunk.outputResults(results)
             sys.exit()
         else:
-            print errorString
+            print(errorString)
             traceback.print_tb(sys.exc_info()[2])
             sys.exit()
