@@ -3,4 +3,4 @@
 
 Initially released on Splunkbase by Aplura LLC.
 ***
-I updated this to work in Python3 on Splunk 8.x.
+I updated this to work in Python3 on Splunk 8.x on 9-18-2020
